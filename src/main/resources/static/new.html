@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>历史数据趋势</title>
+  <style>
+    /* 外部容器：确保图表和看板居中且有足够宽度 */
+    .dashboard-area{
+      width: 400px; /* 统一宽度，以确保所有内容对齐 */
+      margin: 50px auto;
+    }
+
+    /* ------------------------------------- */
+    /* 2. 看板布局样式 (实时数据) */
+    /* ------------------------------------- */
+    .dashboard-area h1 {
+      font-size: 1.5em;
+      color: #333;
+      margin-bottom: 20px;
+      padding-left: 20px;
+    }
+
+    .dashboard-container {
+      display: flex; /* 确保每日统计和本月统计并排 */
+      gap: 20px;
+      /* 根据您的图片，卡片数量少，使用 space-between 或 flex-start 均可 */
+      justify-content: center;
+      padding: 0 20px;
+      flex-wrap: nowrap;
+    }
+
+    .card {
+        width: 400px;
+        flex: 0 0 400px;
+      padding: 20px;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      background: #fff;
+    }
+
+    .card h2 {
+      margin-top: 0;
+      font-size: 1.1em;
+      color: #333;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #eee;
+      margin-bottom: 20px;
+    }
+
+    /* ------------------------------------- */
+    /* 3. 统计项内容样式 (关键对齐修正) */
+    /* ------------------------------------- */
+    .stat-item {
+      display: flex;
+      align-items: flex-start; /* 顶部对齐 */
+      margin-bottom: 15px;
+    }
+
+    .stat-item img {
+      width: 30px;
+      height: 30px;
+      margin-right: 15px;
+      flex-shrink: 0; /* 防止图标被压缩 */
+    }
+
+    .stat-values {
+      display: flex;
+      flex-direction: column; /* 垂直堆叠 current-value 和 comparison */
+      flex-grow: 1;
+    }
+
+    .current-value {
+      font-size: 1.2em;
+      font-weight: bold;
+      color: #ff9800; /* 主色调，如原石色 */
+      margin-bottom: 5px; /* 与下一行留出间距 */
+    }
+
+    .comparison {
+      display: flex;
+      /* 关键修正: 让对比数据和百分比向左靠拢 */
+      justify-content: flex-start;
+      gap: 15px; /* 元素间距 */
+        font-size: 1.0em;
+        color: #666;
+    }
+
+    /* 变化量（百分比和差额）的颜色 */
+    .change-positive {
+      color: #4CAF50; /* 绿色 */
+      font-weight: 500;
+    }
+    .change-negative {
+      color: #F44336; /* 红色 */
+      font-weight: 500;
+    }
+
+    /* 确保变化量和百分比作为一个组，并靠左 */
+    .comparison span:last-child {
+      /* 如果需要，可以微调位置 */
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+</head>
+<body>
+<div class="dashboard-container">
+
+    <div class="card" id="daily-stats-card">
+      <h2>每日统计</h2>
+    </div>
+
+    <div class="card" id="monthly-stats-card">
+      <h2>本月统计</h2>
+    </div>
+</div>
+<!--<h2>历史数据</h2>-->
+<div id="monthly-bar-chart"
+     style="width: 1600px;height:350px; margin: 10px auto 50px auto;"></div>
+
+<div id="daily-bar-chart" style="width: 1600px;height:350px; margin: 50px auto;"></div>
+
+<script>
+
+  // 假设您已经将月趋势图的容器ID改为 'monthly-bar-chart'
+  var monthlyChart = echarts.init(document.getElementById('monthly-bar-chart'));
+  var dailyChart = echarts.init(document.getElementById('daily-bar-chart'));
+
+  // (保持原有的 fetch('/api/monthly-trend') 逻辑不变, 只是将 myChart 改为 monthlyChart)
+  monthlyChart.showLoading();
+  fetch('/api/monthly-trend')
+          .then(response => response.json())
+          .then(data => {
+            monthlyChart.hideLoading();
+            var option = {
+
+              title: [
+                {
+                  // 新增的左上角标题
+                  text: '历史数据',
+                  left: '10%', // 将标题往右推，远离 '原石' Y轴标题
+                  top: '10px', // 将标题往下推，远离顶部
+                  textStyle: {
+                    fontSize: 20,
+                    color: '#333'
+                  }
+                },
+                {
+                text: '月趋势',
+                left: 'center'
+              }],
+              tooltip: {
+                trigger: 'axis',
+                axisPointer: { type: 'shadow' }
+              },
+              legend: {
+                data: ['原石', '摩拉'],
+                top: 40
+              },
+              grid: {
+                left: '3%',
+                right: '4%',
+                bottom: '3%',
+                containLabel: true // 包含坐标轴标签，防止刻度标签溢出
+              },
+
+              // --- X 轴配置 ---
+              xAxis: {
+                type: 'category',
+                data: data.months, // 月份数据
+                name: '收入记录'
+              },
+
+              // --- Y 轴配置 1: 原石 (左轴) ---
+              yAxis: [
+                {
+                  type: 'value',
+                  name: '原石',
+                  min: 0,
+                  // max: 15000,
+                  interval: 5000,
+                  axisLabel: {
+                    formatter: '{value}'
+                  }
+                },
+                // --- Y 轴配置 2: 摩拉 (右轴) ---
+                {
+                  type: 'value',
+                  name: '摩拉',
+                  min: 0,
+                  // max: 15000000,
+                  interval: 5000000,
+                  splitLine: { show: true }, // 隐藏右侧轴的网格线，保持图表简洁
+                  axisLabel: {
+                    formatter: function(value) {
+                      // 格式化大数值，如 10000000 -> 10,000,000
+                      return value.toLocaleString();
+                    }
+                  }
+                }
+              ],
+
+              // --- 系列数据配置 ---
+              series: [
+                {
+                  name: '原石',
+                  type: 'bar',
+                  data: data.primogems, // 绑定原石数据
+                  yAxisIndex: 0, // 绑定到左侧 Y 轴 (Y轴索引 0)
+                  itemStyle: {
+                    color: '#ee7752' // 橙色，与图片相似
+                  }
+                },
+                {
+                  name: '摩拉',
+                  type: 'bar',
+                  data: data.mora, // 绑定摩拉数据
+                  yAxisIndex: 1, // 绑定到右侧 Y 轴 (Y轴索引 1)
+                  itemStyle: {
+                    color: '#6a79e4' // 蓝色，与图片相似
+                  }
+                }
+              ]
+            };
+
+            monthlyChart.setOption(option);
+          })
+          .catch(error => {
+            console.error('获取月趋势数据时发生错误:', error);
+            monthlyChart.hideLoading();
+            // 可以在这里显示一个错误提示
+            monthlyChart.setOption({ title: { text: '月趋势数据加载失败', left: 'center' } });
+          });
+
+
+  // ------------------------------------
+  // 2. 日趋势图渲染逻辑 (新增)
+
+  dailyChart.showLoading();
+
+  fetch('/api/daily-trend') // 访问新的接口
+          .then(response => response.json())
+          .then(data => {
+            dailyChart.hideLoading();
+
+            var dailyOption = {
+              title: {
+                text: '日趋势', // 标题更改
+                left: 'center'
+              },
+              tooltip: {
+                trigger: 'axis',
+                axisPointer: { type: 'shadow' }
+              },
+              legend: {
+                data: ['原石', '摩拉'],
+                top: 40
+              },
+              grid: {
+                left: '3%',
+                right: '4%',
+                bottom: '3%',
+                containLabel: true
+              },
+
+              // --- X 轴配置 ---
+              xAxis: {
+                type: 'category',
+                data: data.months, // 使用日期数据
+                name: '历史数据',
+                // ✨ 新增或修改以下配置 ✨
+                axisLabel: {
+                  // 1. 设置标签显示间隔：例如，每隔 6 个数据显示一个标签（即显示每 7 天的数据）
+                  // 您可以根据实际天数调整这个值（例如 30 天中显示 5 个标签，间隔为 5）
+                  interval: 0,
+
+                  // 2. 可选：如果标签仍然重叠，可以旋转标签
+                  // rotate: 45
+                }
+              },
+
+              // --- Y 轴配置 1: 原石 (左轴) ---
+              yAxis: [
+                {
+                  type: 'value',
+                  name: '原石',
+                  min: 0,
+                  // 根据图片数据，原石最大值约 1500
+                  max: 1500,
+                  interval: 500,
+                  axisLabel: {
+                    formatter: '{value}'
+                  }
+                },
+                // --- Y 轴配置 2: 摩拉 (右轴) ---
+                {
+                  type: 'value',
+                  name: '摩拉',
+                  min: 0,
+                  // 根据图片数据，摩拉最大值约 12,000,000
+                  max: 1200000,
+                  interval: 200000,
+                  splitLine: { show: false },
+                  axisLabel: {
+                    formatter: function(value) {
+                      return value.toLocaleString();
+                    }
+                  }
+                }
+              ],
+
+              // --- 系列数据配置 ---
+              series: [
+                {
+                  name: '原石',
+                  type: 'bar',
+                  data: data.primogems,
+                  yAxisIndex: 0, // 绑定到左侧 Y 轴
+                  itemStyle: {
+                    color: '#ee7752'
+                  }
+                },
+                {
+                  name: '摩拉',
+                  type: 'bar',
+                  data: data.mora,
+                  yAxisIndex: 1, // 绑定到右侧 Y 轴
+                  itemStyle: {
+                    color: '#6a79e4'
+                  }
+                }
+              ]
+            };
+
+            dailyChart.setOption(dailyOption);
+          })
+          .catch(error => {
+            console.error('获取日趋势数据时发生错误:', error);
+            dailyChart.hideLoading();
+            // 可以在这里显示一个错误提示
+            dailyChart.setOption({ title: { text: '日趋势数据加载失败', left: 'center' } });
+          });
+
+  // 3. 看板数据渲染逻辑 (新增)
+  // ------------------------------------
+  fetch('/api/dashboard-data')
+          .then(response => response.json())
+          .then(data => {
+            // 假设您已经有原石和摩拉的图标路径
+            const primogemIcon = 'primogem_icon.png';
+            const moraIcon = 'mora_icon.png';
+
+            // A. 渲染每日统计卡片
+            renderStatsCard(
+                    'daily-stats-card',
+                    [
+                      { icon: primogemIcon, period: '今日', stats: data.dailyPrimogems, prevPeriod: '昨日' },
+                      { icon: moraIcon, stats: data.dailyMora, period: '今日', prevPeriod: '昨日' }
+                    ]
+            );
+
+            // B. 渲染本月统计卡片
+            renderStatsCard(
+                    'monthly-stats-card',
+                    [
+                      { icon: primogemIcon, period: '本月', stats: data.monthlyPrimogems, prevPeriod: '上月' },
+                      { icon: moraIcon, stats: data.monthlyMora, period: '本月', prevPeriod: '上月' }
+                    ]
+            );
+          })
+          .catch(error => {
+            console.error('获取看板数据失败:', error);
+          });
+
+  /**
+   * 渲染单个统计卡片的内容
+   * @param {string} elementId - 目标 div 的 ID (e.g., 'daily-stats-card')
+   * @param {Array<Object>} items - 包含数据和图标的对象数组
+   */
+  function renderStatsCard(elementId, items) {
+    const container = document.getElementById(elementId);
+    let html = '<h2>' + container.querySelector('h2').textContent + '</h2>'; // 保留标题
+
+    items.forEach(item => {
+      const stats = item.stats;
+
+      // 确定对比值的颜色 (如果数字大于 0 则为绿色，小于 0 则为红色)
+      const diffClass = stats.diffAmount.startsWith('+') ? 'change-positive' :
+              stats.diffAmount.startsWith('-') ? 'change-negative' : '';
+
+      // 格式化当前值 (使用逗号分隔)
+      const formattedCurrent = stats.current.toLocaleString();
+      const formattedPrevious = stats.previous.toLocaleString();
+
+      html += `
+            <div class="stat-item">
+                <img src="${item.icon}" alt="Icon">
+                <div class="stat-values">
+                    <div class="current-value">
+                        ${item.period} ${formattedCurrent}
+                        <span class="${diffClass}">
+                            ${stats.diffAmount}
+                        </span>
+                    </div>
+                    <div class="comparison">
+                        <span>${item.prevPeriod} ${formattedPrevious}</span>
+                        <span class="${diffClass}">
+                            ${stats.diffPercent}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+  }
+
+</script>
+</body>
+</html>

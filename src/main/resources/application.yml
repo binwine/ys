@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: ys
+
+  dynamic:
+    primary: starward
+    datasource:
+      starward:
+        driver-class-name: org.sqlite.JDBC
+        url: jdbc:sqlite:D:/wishRecordGenshin/Starward/data/StarwardDatabase.db
+        username:
+        password:
+        type: com.alibaba.druid.pool.DruidDataSource
+        druid:
+          # SQLite 不支持校验与连接测试，必须全部关闭
+          test-while-idle: false
+          test-on-borrow: false
+          test-on-return: false
+
+          # 必须禁用 validation-query，否则 Druid 初始化失败
+          validation-query: SELECT 1
+
+          # 禁用所有监控过滤器，避免 SQL 解析报错
+          filters:
+
+          # 让 Druid 以 H2 模式运行（兼容 SQLite）
+          db-type: h2
+
+  profiles:
+    active: prod
+
+
+server:
+  port: 8081
+
+
+
+
+
+
+

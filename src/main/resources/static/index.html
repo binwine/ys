@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>SQLite 数据统计图表 (MyBatis-Plus)</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+</head>
+<body>
+<div id="main" style="width: 800px;height:600px; margin: 50px auto;"></div>
+
+<script>
+    // 1. 初始化图表
+    var myChart = echarts.init(document.getElementById('main'));
+    myChart.showLoading(); // 加载动画
+
+    // 2. 使用 fetch 获取后端数据
+    fetch('/api/chart-data')
+        .then(response => response.json())
+        .then(data => {
+            myChart.hideLoading(); // 隐藏加载动画
+
+            // 3. ✨ 关键步骤：处理数据 ✨
+            // 提取 X 轴 (产品名称)
+            const names = data.map(item => item.productName);
+            // 提取 Y 轴 (销售总量)
+            const values = data.map(item => item.total);
+
+            // 4. ECharts 配置项
+            var option = {
+                title: { text: '产品销售总量统计', subtext: '数据来源：SQLite + MyBatis-Plus' },
+                tooltip: { trigger: 'axis' },
+                legend: { data: ['销量'] },
+
+                xAxis: {
+                    type: 'category',
+                    data: names, // X轴数据
+                    axisLabel: {
+                        rotate: 30 // 当名称过长时，倾斜显示
+                    }
+                },
+                yAxis: {
+                    type: 'value'
+                },
+                series: [{
+                    name: '销量',
+                    type: 'bar', // 柱状图
+                    data: values, // Y轴数据
+                    itemStyle: {
+                        color: '#5470C6' // 设置颜色
+                    }
+                }]
+            };
+
+            // 5. 渲染图表
+            myChart.setOption(option);
+        })
+        .catch(error => {
+            console.error('获取或渲染数据时发生错误:', error);
+            myChart.hideLoading();
+            // 可以在图表上显示错误信息
+            myChart.setOption({ title: { text: '数据加载失败', subtext: error.message } });
+        });
+</script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.wine.ys.mapper.StarwardMapper">
+
+    <resultMap id="MonthlyStatsMap" type="com.wine.ys.model.entity.MonthlyStats">
+        <result column="year" property="year"/>
+        <result column="month" property="month"/>
+        <result column="currentPrimogems" property="currentPrimogems"/>
+        <result column="currentMora" property="currentMora"/>
+        <result column="RecordDate" property="time"/>
+    </resultMap>
+
+    <resultMap id="StatRowMap" type="com.wine.ys.model.entity.dto.StatRow">
+        <result column="recordPeriod" property="recordPeriod"/>
+        <result column="totalPrimogems" property="totalPrimogems"/>
+        <result column="totalMora" property="totalMora"/>
+    </resultMap>
+
+    <select id="getRawDataFromDb" resultMap="MonthlyStatsMap">
+        SELECT
+            Year,
+            Month,
+            CurrentPrimogems,
+            CurrentMora
+        FROM
+            GenshinTravelersDiaryMonthData
+        ORDER BY
+            Year ASC,
+            Month ASC
+            LIMIT 4;
+    </select>
+
+    <select id="getDailyTrendData" resultMap="MonthlyStatsMap">
+        SELECT
+--             1. 提取日期部分 (YYYY-MM-DD) 作为 X 轴标签
+            STRFTIME('%Y-%m-%d', T.Time) AS RecordDate,
+
+            -- 2. 条件聚合：当 Type=1 (原石) 时，将 Value 计入 DailyPrimogems
+            SUM(CASE WHEN T.Type = 1 THEN T.number ELSE 0 END) AS currentPrimogems,
+
+            -- 3. 条件聚合：当 Type=2 (摩拉) 时，将 Value 计入 DailyMora
+            SUM(CASE WHEN T.Type = 2 THEN T.number ELSE 0 END) AS currentMora
+
+        FROM
+            GenshinTravelersDiaryAwardItem T
+
+        WHERE
+        -- 4. 过滤条件：只查询最近 30 天的数据
+        -- DATE('now', '-30 day') 计算出 30 天前的日期 (YYYY-MM-DD)
+        -- STRFTIME('%Y-%m-%d', T.Time) 确保只比较日期部分
+            STRFTIME('%Y-%m-%d', T.Time) >= DATE('now', '-30 day')
+        GROUP BY
+            RecordDate
+        ORDER BY
+            RecordDate ASC;
+    </select>
+    <select id="getDailyDashbord" resultMap="StatRowMap">
+        SELECT
+            STRFTIME('%Y-%m-%d', T.Time) AS recordPeriod,
+            SUM(CASE WHEN T.Type = 1 THEN T.number ELSE 0 END) AS totalPrimogems,
+            SUM(CASE WHEN T.Type = 2 THEN T.number ELSE 0 END) AS totalMora
+        FROM
+            GenshinTravelersDiaryAwardItem T
+        WHERE
+                STRFTIME('%Y-%m-%d', T.Time) IN (
+                DATE('now', 'localtime'),
+                DATE('now', 'localtime', '-1 day')
+                )
+        GROUP BY
+            recordPeriod
+        ORDER BY
+            recordPeriod DESC
+    </select>
+
+    <select id="getMonthlyDashbord" resultMap="StatRowMap">
+        SELECT
+            STRFTIME('%Y-%m', T.Time) AS recordPeriod,
+            SUM(CASE WHEN T.Type = 1 THEN T.number ELSE 0 END) AS totalPrimogems,
+            SUM(CASE WHEN T.Type = 2 THEN T.number ELSE 0 END) AS totalMora
+        FROM
+            GenshinTravelersDiaryAwardItem T
+        WHERE
+                STRFTIME('%Y-%m', T.Time) IN (
+                                              STRFTIME('%Y-%m', 'now', 'localtime'),
+                                              STRFTIME('%Y-%m', 'now', 'localtime', 'start of month', '-1 month')
+                )
+        GROUP BY
+            recordPeriod
+        ORDER BY
+            recordPeriod DESC
+    </select>
+
+</mapper>
